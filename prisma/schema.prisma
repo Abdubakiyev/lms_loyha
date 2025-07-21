@@ -51,6 +51,7 @@ model User {
   image     String?
   createdAt DateTime   @default(now())
   refreshToken String?
+  isVerified Boolean  @default(false)
 
   mentorProfile   MentorProfile?
   assignedCourses AssignedCourse[]

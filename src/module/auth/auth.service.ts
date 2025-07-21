@@ -8,11 +8,15 @@ import {
   import { LoginDto } from './dto/login.dto';
   import * as bcrypt from 'bcryptjs';
   import * as jwt from 'jsonwebtoken';
+  import { MailService } from 'src/common/mail/mail.service';
+  import { RedisService } from 'src/core/redis/redis.service';
   
   @Injectable()
   export class AuthService {
     constructor(
-        private prisma: PrismaService,
+      private prisma: PrismaService,
+      private mailService: MailService,
+      private redis: RedisService,
     ) {}
   
     private generateTokens(payload: any) {
@@ -31,48 +35,50 @@ import {
       return { accessToken, refreshToken };
     }
   
+
     async register(dto: RegisterDto) {
-      const userExists = await this.prisma.user.findFirst({
-        where: { phone: dto.phone },
-      });
-  
-      if (userExists) throw new ConflictException('Phone already registered');
-  
-      const hashedPassword = await bcrypt.hash(dto.password, 10);
-  
-      const user = await this.prisma.user.create({
-        data: {
+        const existingUser = await this.prisma.user.findFirst({
+          where: { OR: [{ email: dto.email }, { phone: dto.phone }] },
+        });
+      
+        if (existingUser) throw new ConflictException('User already exists');
+      
+        const hashedPassword = await bcrypt.hash(dto.password, 10);
+      
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+      
+        const userData = {
           fullName: dto.fullName,
           email: dto.email,
           phone: dto.phone,
           password: hashedPassword,
-        },
-      });
-  
-      const payload = { sub: user.id, phone: user.phone, role: user.role };
-      const { accessToken, refreshToken } = this.generateTokens(payload);
-  
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { refreshToken },
-      });
-  
-      return {
-        message: 'User registered',
-        accessToken,
-        refreshToken,
-      };
+        };
+        await this.redis.set(`verify:${dto.email}`, JSON.stringify(userData), 900);
+        await this.redis.set(`code:${dto.email}`, code, 900);
+      
+        await this.mailService.sendVerificationCode(dto.email, code);
+      
+        return { message: 'Tasdiqlash kodi emailingizga yuborildi.' };
     }
+      
   
     async login(dto: LoginDto) {
       const user = await this.prisma.user.findFirst({
         where: { phone: dto.phone },
       });
   
-      if (!user) throw new UnauthorizedException('Invalid credentials');
+      if (!user) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
   
       const isMatch = await bcrypt.compare(dto.password, user.password);
-      if (!isMatch) throw new UnauthorizedException('Invalid credentials');
+      if (!isMatch) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+  
+      if (!user.isVerified) {
+        throw new UnauthorizedException('Please verify your email first.');
+      }
   
       const payload = { sub: user.id, phone: user.phone, role: user.role };
       const { accessToken, refreshToken } = this.generateTokens(payload);
@@ -88,5 +94,37 @@ import {
         refreshToken,
       };
     }
+    async verifyCode(email: string, code: string): Promise<{ accessToken: string; refreshToken: string }> {
+        const storedCode = await this.redis.get(`code:${email}`);
+      
+        if (!storedCode || storedCode !== code) {
+          throw new UnauthorizedException('Tasdiqlash kodi noto‘g‘ri yoki eskirgan.');
+        }
+      
+        const userDataStr = await this.redis.get(`verify:${email}`);
+        if (!userDataStr) {
+          throw new UnauthorizedException('Ro‘yxatdan o‘tgan maʼlumot topilmadi.');
+        }
+      
+        const userData = JSON.parse(userDataStr);
+      
+        const user = await this.prisma.user.create({ data: userData });
+      
+        await this.redis.del(`code:${email}`);
+        await this.redis.del(`verify:${email}`);
+      
+        const payload = { sub: user.id, email: user.email, role: user.role };
+      
+        const { accessToken, refreshToken } = this.generateTokens(payload);
+      
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { refreshToken },
+        });
+      
+        return { accessToken, refreshToken };
+      }
+      
+      
 }
   

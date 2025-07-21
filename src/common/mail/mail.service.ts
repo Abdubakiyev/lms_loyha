@@ -12,13 +12,13 @@ export class MailService {
     },
   });
 
-  async sendVerificationEmail(email: string, token: string) {
-    const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+  async sendVerificationCode(email: string, code: string) {
     await this.transporter.sendMail({
       from: process.env.EMAIL_FROM,
       to: email,
-      subject: 'Email tasdiqlash',
-      html: `<p>Profilingizni tasdiqlash uchun <a href="${verifyUrl}">havolani bosing</a></p>`,
+      subject: 'Email tasdiqlash kodi',
+      html: `<p>Tasdiqlash kodingiz: <b>${code}</b></p>
+             <p>Bu kod 15 daqiqa davomida amal qiladi.</p>`,
     });
   }
 }
