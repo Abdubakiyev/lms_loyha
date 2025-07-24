@@ -98,12 +98,12 @@ import {
         const storedCode = await this.redis.get(`code:${email}`);
       
         if (!storedCode || storedCode !== code) {
-          throw new UnauthorizedException('Tasdiqlash kodi noto‘g‘ri yoki eskirgan.');
+          throw new UnauthorizedException('Tasdiqlash kodi notogri yoki eskirgan.');
         }
       
         const userDataStr = await this.redis.get(`verify:${email}`);
         if (!userDataStr) {
-          throw new UnauthorizedException('Ro‘yxatdan o‘tgan maʼlumot topilmadi.');
+          throw new UnauthorizedException('Royxatdan otgan malumot topilmadi.');
         }
       
         const userData = JSON.parse(userDataStr);

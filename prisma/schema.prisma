@@ -42,19 +42,21 @@ enum ExamAnswer {
 }
 
 model User {
-  id        Int        @id @default(autoincrement())
-  email     String     @unique
-  phone     String     @unique 
+  id        String   @id @default(uuid())
+  email     String   @unique
+  phone     String   @unique 
   password  String
-  role      UserRole   @default(STUDENT)
+  role      UserRole @default(STUDENT)
   fullName  String
   image     String?
-  createdAt DateTime   @default(now())
+  createdAt DateTime @default(now())
   refreshToken String?
-  isVerified Boolean  @default(false)
+  isVerified Boolean @default(false)
 
+  payments  Payment[]
   mentorProfile   MentorProfile?
-  assignedCourses AssignedCourse[]
+  mentorAssignedCourses AssignedCourse[]   @relation("MentorAssignedCourses")
+  userAssignedCourses   AssignedCourse[]   @relation("UserAssignedCourses")
   purchasedCourses PurchasedCourse[]
   ratings         Rating[]
   lastActivity    LastActivity?
@@ -62,13 +64,12 @@ model User {
   homeworkSubmissions HomeworkSubmission[]
   examResults     ExamResult[]
   questions       Question[]
-  questionAnswer  QuestionAnswer?
-
+  answers         QuestionAnswer[]
   coursesMentored Course[] @relation("MentorCourses")
 }
 
 model MentorProfile {
-  id        Int    @id @default(autoincrement())
+  id        String  @id @default(uuid())
   about     String?
   job       String?
   experience Int
@@ -78,12 +79,12 @@ model MentorProfile {
   facebook  String?
   github    String?
   website   String?
-  userId    Int    @unique
-  user      User   @relation(fields: [userId], references: [id])
+  userId    String  @unique
+  user      User    @relation(fields: [userId], references: [id])
 }
 
 model CourseCategory {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   name      String
   createdAt DateTime @default(now())
   courses   Course[]
@@ -98,8 +99,8 @@ model Course {
   introVideo  String?
   level       CourseLevel
   published   Boolean  @default(false)
-  categoryId  Int
-  mentorId    Int
+  categoryId  String
+  mentorId    String
   updatedAt   DateTime?
   createdAt   DateTime @default(now())
 
@@ -107,6 +108,7 @@ model Course {
   mentor   User           @relation("MentorCourses", fields: [mentorId], references: [id])
   assignedCourses AssignedCourse[]
   purchasedCourses PurchasedCourse[]
+  payments  Payment[]
   ratings         Rating[]
   questions       Question[]
   lessonGroups    LessonGroup[]
@@ -115,35 +117,35 @@ model Course {
 }
 
 model AssignedCourse {
-  userId   Int
-  courseId String
+  id        String   @id @default(uuid())
+  userId    String
+  courseId  String
+  mentorId  String
   createdAt DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  mentor    User   @relation("MentorAssignedCourses", fields: [mentorId], references: [id])
+  user      User   @relation("UserAssignedCourses", fields: [userId], references: [id])
   course Course @relation(fields: [courseId], references: [id])
-
-  @@id([userId, courseId])
 }
 
 model PurchasedCourse {
-  courseId   String
-  userId     Int
-  amount     Decimal?
-  paidVia    PaidVia
-  purchasedAt DateTime @default(now())
+  id           String   @id @default(uuid())
+  courseId     String
+  userId       String
+  amount       Decimal?
+  paidVia      PaidVia
+  purchasedAt  DateTime @default(now())
 
   course Course @relation(fields: [courseId], references: [id])
   user   User   @relation(fields: [userId], references: [id])
-
-  @@id([courseId, userId])
 }
 
 model Rating {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   rate      Int
   comment   String
   courseId  String
-  userId    Int
+  userId    String
   createdAt DateTime @default(now())
 
   course Course @relation(fields: [courseId], references: [id])
@@ -151,29 +153,29 @@ model Rating {
 }
 
 model LastActivity {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @unique
+  id        String   @id @default(uuid())
+  userId    String   @unique
   courseId  String?
-  groupId   Int?
+  groupId   String?
   lessonId  String?
   url       String?
   updatedAt DateTime @default(now())
 
-  user    User        @relation(fields: [userId], references: [id])
-  course  Course?     @relation(fields: [courseId], references: [id])
+  user    User         @relation(fields: [userId], references: [id])
+  course  Course?      @relation(fields: [courseId], references: [id])
   group   LessonGroup? @relation(fields: [groupId], references: [id])
-  lesson  Lesson?     @relation(fields: [lessonId], references: [id])
+  lesson  Lesson?      @relation(fields: [lessonId], references: [id])
 }
 
 model LessonGroup {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   name      String
   courseId  String
   createdAt DateTime @default(now())
 
-  course  Course  @relation(fields: [courseId], references: [id])
-  lessons Lesson[]
-  exams   Exam[]
+  course         Course        @relation(fields: [courseId], references: [id])
+  lessons        Lesson[]
+  exams          Exam[]
   lastActivities LastActivity[]
   examResults    ExamResult[]
 }
@@ -183,22 +185,22 @@ model Lesson {
   name      String
   about     String
   video     String
-  groupId   Int
+  groupId   String
   courseId  String
   updatedAt DateTime?
   createdAt DateTime @default(now())
 
-  group   LessonGroup @relation(fields: [groupId], references: [id])
-  course  Course      @relation(fields: [courseId], references: [id]) // ✅ TO‘G‘RI ALOQA
-  files   LessonFile[]
-  views   LessonView[]
-  homework Homework?
+  group          LessonGroup     @relation(fields: [groupId], references: [id])
+  course         Course          @relation(fields: [courseId], references: [id])
+  files          LessonFile[]
+  views          LessonView[]
+  homework       Homework?
   lastActivities LastActivity[]
 }
 
 model LessonView {
   lessonId String
-  userId   Int
+  userId   String
   view     Boolean
 
   lesson Lesson @relation(fields: [lessonId], references: [id])
@@ -208,7 +210,7 @@ model LessonView {
 }
 
 model LessonFile {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   file      String
   note      String?
   lessonId  String
@@ -218,7 +220,7 @@ model LessonFile {
 }
 
 model Homework {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   task      String
   file      String?
   lessonId  String  @unique
@@ -230,50 +232,50 @@ model Homework {
 }
 
 model HomeworkSubmission {
-  id        Int      @id @default(autoincrement())
-  text      String?
-  file      String
-  reason    String?
-  status    HomeworkSubStatus @default(PENDING)
-  homeworkId Int
-  userId     Int
-  updatedAt DateTime?
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  text       String?
+  file       String
+  reason     String?
+  status     HomeworkSubStatus @default(PENDING)
+  homeworkId String
+  userId     String
+  updatedAt  DateTime?
+  createdAt  DateTime @default(now())
 
   homework Homework @relation(fields: [homeworkId], references: [id])
   user     User     @relation(fields: [userId], references: [id])
 }
 
 model Exam {
-  id        Int      @id @default(autoincrement())
-  question  String
-  variantA  String
-  variantB  String
-  variantC  String
-  variantD  String
-  answer    ExamAnswer
-  lessonGroupId Int
-  createdAt DateTime @default(now())
+  id            String   @id @default(uuid())
+  question      String
+  variantA      String
+  variantB      String
+  variantC      String
+  variantD      String
+  answer        ExamAnswer
+  lessonGroupId String
+  createdAt     DateTime @default(now())
 
   group LessonGroup @relation(fields: [lessonGroupId], references: [id])
 }
 
 model ExamResult {
-  id        Int      @id @default(autoincrement())
-  lessonGroupId Int
-  userId     Int
-  passed     Boolean
-  corrects   Int
-  wrongs     Int
-  createdAt  DateTime @default(now())
+  id            String   @id @default(uuid())
+  lessonGroupId String
+  userId        String
+  passed        Boolean
+  corrects      Int
+  wrongs        Int
+  createdAt     DateTime @default(now())
 
   group LessonGroup @relation(fields: [lessonGroupId], references: [id])
   user  User        @relation(fields: [userId], references: [id])
 }
 
 model Question {
-  id        Int      @id @default(autoincrement())
-  userId    Int
+  id        String   @id @default(uuid())
+  userId    String
   courseId  String
   text      String
   file      String?
@@ -282,22 +284,30 @@ model Question {
   updatedAt DateTime?
   createdAt DateTime @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
-  course Course @relation(fields: [courseId], references: [id])
-
-  answer QuestionAnswer? @relation("QuestionToAnswer") 
+  user      User     @relation(fields: [userId], references: [id])
+  course    Course   @relation(fields: [courseId], references: [id])
+  answer    QuestionAnswer? @relation("QuestionToAnswer")
 }
 
 model QuestionAnswer {
-  id         Int      @id @default(autoincrement())
-  questionId Int      @unique
-  userId     Int      @unique
-  text       String
-  file       String?
-  updatedAt  DateTime?
+  id          String   @id @default(uuid())
+  questionId  String   @unique
+  userId      String
+  text        String
+  file        String?
+  updatedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  question    Question @relation("QuestionToAnswer", fields: [questionId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+}
+model Payment {
+  id         String   @id @default(uuid())
+  userId     String
+  courseId   String
+  amount     Decimal
   createdAt  DateTime @default(now())
 
-  question Question @relation("QuestionToAnswer", fields: [questionId], references: [id])
-  user     User     @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
 }
-

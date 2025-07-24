@@ -2,6 +2,7 @@ import { Injectable, ConflictException, NotFoundException } from '@nestjs/common
 import { PrismaService } from 'src/core/database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { Roles } from 'src/common/decorators/roles.decorator';
 
 @Injectable()
 export class UserService {
@@ -37,20 +38,28 @@ export class UserService {
     return this.prisma.user.findMany();
   }
 
-  async findOne(id: number) {
+  async findOne(id: string) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User topilmadi');
     return user;
   }
 
-  async update(id: number, dto: UpdateUserDto) {
+  async update(id: string, dto: UpdateUserDto) {
+    const data: any = { ...dto };
+  
+    if (dto.role) {
+      data.role = dto.role;
+    }
+  
     return this.prisma.user.update({
       where: { id },
-      data: dto,
+      data,
     });
   }
+  
+  
 
-  async remove(id: number) {
+  async remove(id: string) {
     return this.prisma.user.delete({ where: { id } });
   }
 }

@@ -14,11 +14,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    // MUHIM: role ni return qilish shart!
     return {
       id: payload.sub,
       email: payload.email,
-      role: payload.role, // <-- BU QATORNI QO‘SHING
+      role: payload.role, 
     };
   }
 }
