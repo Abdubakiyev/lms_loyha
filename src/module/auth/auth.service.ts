@@ -53,8 +53,9 @@ import {
           phone: dto.phone,
           password: hashedPassword,
         };
-        await this.redis.set(`verify:${dto.email}`, JSON.stringify(userData), 900);
-        await this.redis.set(`code:${dto.email}`, code, 900);
+        await this.redis.set(`user-data:${dto.email}`, JSON.stringify(userData), 900); 
+        await this.redis.set(`verify-code:${dto.email}`, code, 900); 
+
       
         await this.mailService.sendVerificationCode(dto.email, code);
       
@@ -95,36 +96,38 @@ import {
       };
     }
     async verifyCode(email: string, code: string): Promise<{ accessToken: string; refreshToken: string }> {
-        const storedCode = await this.redis.get(`code:${email}`);
-      
-        if (!storedCode || storedCode !== code) {
-          throw new UnauthorizedException('Tasdiqlash kodi notogri yoki eskirgan.');
-        }
-      
-        const userDataStr = await this.redis.get(`verify:${email}`);
-        if (!userDataStr) {
-          throw new UnauthorizedException('Royxatdan otgan malumot topilmadi.');
-        }
-      
-        const userData = JSON.parse(userDataStr);
-      
-        const user = await this.prisma.user.create({ data: userData });
-      
-        await this.redis.del(`code:${email}`);
-        await this.redis.del(`verify:${email}`);
-      
-        const payload = { sub: user.id, email: user.email, role: user.role };
-      
-        const { accessToken, refreshToken } = this.generateTokens(payload);
-      
-        await this.prisma.user.update({
-          where: { id: user.id },
-          data: { refreshToken },
-        });
-      
-        return { accessToken, refreshToken };
+      const normalizedEmail = email.trim().toLowerCase();
+      const normalizedCode = code.trim();
+    
+      const storedCode = await this.redis.get(`verify-code:${normalizedEmail}`);
+    
+      if (!storedCode || storedCode.trim() !== normalizedCode) {
+        throw new UnauthorizedException('Tasdiqlash kodi notogri yoki eskirgan.');
       }
-      
+    
+      const userDataStr = await this.redis.get(`user-data:${normalizedEmail}`);
+      if (!userDataStr) {
+        throw new UnauthorizedException('Royxatdan otgan malumot topilmadi.');
+      }
+    
+      const userData = JSON.parse(userDataStr);
+    
+      const user = await this.prisma.user.create({ data: userData });
+    
+      await this.redis.del(`verify-code:${normalizedEmail}`);
+      await this.redis.del(`user-data:${normalizedEmail}`);
+    
+      const payload = { sub: user.id, email: user.email, role: user.role };
+      const { accessToken, refreshToken } = this.generateTokens(payload);
+    
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { refreshToken },
+      });
+    
+      return { accessToken, refreshToken };
+    }
+    
       
 }
   
